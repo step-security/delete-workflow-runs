@@ -1,1 +1,241 @@
-# delete-workflow-runs
+[![StepSecurity Maintained Action](https://raw.githubusercontent.com/step-security/maintained-actions-assets/main/assets/maintained-action-banner.png)](https://docs.stepsecurity.io/actions/stepsecurity-maintained-actions)
+
+# Delete Workflow Runs v2.1.0
+
+A GitHub Action to delete workflow runs in a repository. This Action uses JavaScript and interacts with the GitHub API to manage workflow runs efficiently.
+
+## Features
+
+- Deletes workflow runs based on retention period and minimum runs to keep.
+- **New:** Supports "daily retention" keep a minimum number of runs per day (`use_daily_retention` input).
+- Deletes orphan workflow runs (runs for deleted workflows).
+- Supports filtering by workflow name, filename, state, or run conclusion.
+- Includes a dry-run mode to simulate deletions without making changes.
+- Skips runs linked to active branches or pull requests (optional).
+- Optimized to avoid uploading `node_modules` by bundling code with `@vercel/ncc`.
+
+## Inputs (summary)
+
+| Input | Default | Description |
+|---|---|---|
+| `token` | `${{github.token}}` | GitHub token used for authentication. Use `github.token` for the current repository or a PAT with `repo` scope for cross-repo access. Token must have appropriate permissions (see Permissions). |
+| `repository` | `${{github.repository}}` | The target repository in `owner/repo` format. |
+| `retain_days` | `30` | Number of days to retain workflow runs before deletion. |
+| `keep_minimum_runs` | `6` | Minimum number of runs to keep per workflow (or per day if `use_daily_retention` is enabled). |
+| `use_daily_retention` | `false` | If `true`, then `keep_minimum_runs` is enforced _per day_ (see Notes). |
+| `delete_workflow_pattern` | (empty) | Target workflows by name or filename. Supports multiple filters separated by `\|`. Example: `build\|deploy` will match workflows with "build" OR "deploy" in name/filename. Omit to target all workflows. |
+| `delete_workflow_by_state_pattern` | (empty) | Filter workflows by state (comma-separated): `active`, `deleted`, `disabled_fork`, `disabled_inactivity`, `disabled_manually`. Use `ALL` for all states. |
+| `delete_run_by_conclusion_pattern` | (empty) | Filter runs by conclusion (comma-separated): `action_required`, `cancelled`, `failure`, `skipped`, `success`. Use `ALL` for all conclusions. |
+| `dry_run` | `false` | If `true`, simulate deletions and only log actions without performing them. |
+| `check_branch_existence` | `false` | If `true`, skip deletion for runs linked to an existing branch. Note: default branch (e.g., `main`) can be excluded from deletion checks as configured. |
+| `check_pullrequest_exist` | `false` | If `true`, skip deletion for runs linked to a pull request. |
+| `baseUrl` | `GitHub API base` | Optional GitHub Enterprise API base URL (e.g. `https://github.mycompany.com/api/v3`). Set when using GitHub Enterprise / GHES. |
+
+
+Notes:
+- Input names reflect the action's expected input keys. Do not change names in your workflow unless you have updated the Action code accordingly.
+- If an input has a default value, it is optional in your workflow inputs.
+- For delete_workflow_pattern you can provide multiple filters separated by the pipe character `|` (interpreted as logical OR). For more complex matching, combine with other inputs.
+
+## Permissions
+
+The token used must allow the Action to list and delete workflow runs. Recommended permission set for the GitHub App/Token used:
+- actions: write
+- contents: read
+
+Using `${{ github.token }}` in workflows is recommended for the current repository. For cross-repository operations or if you need broader scope, use a Personal Access Token (PAT) with `repo` scope and appropriate permissions.
+
+## Setup
+
+To use this Action in your workflows:
+
+- Reference a released tag, for example:
+  - uses: step-security/delete-workflow-runs@v2
+- Ensure the workflow grants the Action the permissions it needs (actions: write, contents: read).
+- Provide a token via the `token` input. For operations on repositories other than the workflow repository or for private repositories, use a PAT with `repo` scope (store it in GitHub Secrets).
+- Configure inputs (retain_days, keep_minimum_runs, delete_workflow_pattern, etc.) per your policy. See the Examples section below for typical workflows (scheduled, manual, matrix).
+- For GitHub Enterprise Server, set `baseUrl` to your API base (e.g. `https://github.mycompany.com/api/v3`).
+
+## Examples
+
+### Scheduled Workflow (monthly)
+
+Run monthly to delete old workflow runs:
+
+```yaml
+name: Delete old workflow runs
+on:
+  schedule:
+    - cron: "0 0 1 * *" # Monthly at 00:00 on the 1st
+jobs:
+  delete-runs:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Delete workflow runs
+        uses: step-security/delete-workflow-runs@v2
+        with:
+          token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          retain_days: 30
+          keep_minimum_runs: 6
+```
+
+### Manual Workflow (workflow_dispatch)
+
+Trigger manually with customizable inputs:
+
+```yaml
+name: Delete old workflow runs
+on:
+  workflow_dispatch:
+    inputs:
+      days:
+        description: "Days to retain runs"
+        default: "30"
+      minimum_runs:
+        description: "Minimum runs to keep"
+        default: "6"
+      use_daily_retention:
+        description: "Enable daily retention (keep minimum runs per day instead of overall)"
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      delete_workflow_pattern:
+        description: "Workflow name or filename (omit for all). Use `|` to separate multiple filters (e.g. 'build|deploy')."
+      delete_workflow_by_state_pattern:
+        description: "Workflow state: active, deleted, disabled_fork, disabled_inactivity, disabled_manually"
+        default: "ALL"
+        type: choice
+        options:
+          - "ALL"
+          - active
+          - deleted
+          - disabled_inactivity
+          - disabled_manually
+      delete_run_by_conclusion_pattern:
+        description: "Run conclusion: action_required, cancelled, failure, skipped, success"
+        default: "ALL"
+        type: choice
+        options:
+          - "ALL"
+          - "Unsuccessful: action_required,cancelled,failure,skipped"
+          - action_required
+          - cancelled
+          - failure
+          - skipped
+          - success
+      dry_run:
+        description: "Simulate deletions"
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+jobs:
+  delete-runs:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Delete workflow runs
+        uses: step-security/delete-workflow-runs@v2
+        with:
+          token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          retain_days: ${{ github.event.inputs.days }}
+          keep_minimum_runs: ${{ github.event.inputs.minimum_runs }}
+          use_daily_retention: ${{ github.event.inputs.use_daily_retention }}
+          delete_workflow_pattern: ${{ github.event.inputs.delete_workflow_pattern }}
+          delete_workflow_by_state_pattern: ${{ github.event.inputs.delete_workflow_by_state_pattern }}
+          delete_run_by_conclusion_pattern: >-
+            ${{
+              startsWith(github.event.inputs.delete_run_by_conclusion_pattern, 'Unsuccessful:') &&
+              'action_required,cancelled,failure,skipped' ||
+              github.event.inputs.delete_run_by_conclusion_pattern
+            }}
+          dry_run: ${{ github.event.inputs.dry_run }}
+```
+
+### Multiple repositories (matrix)
+
+Run the Action for multiple repositories using a matrix job. Note: when operating on repositories other than the workflow repo, you must provide a PAT with `repo` scope (use a secret such as `secrets.PAT_TOKEN`).
+
+```yaml
+name: Delete old workflow runs across repos
+on:
+  workflow_dispatch:
+    inputs:
+      days:
+        description: "Days to retain runs"
+        default: "30"
+      minimum_runs:
+        description: "Minimum runs to keep"
+        default: "6"
+      use_daily_retention:
+        description: "Enable daily retention (keep minimum runs per day instead of overall)"
+        default: "false"
+jobs:
+  delete-multiple-repos:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        repository: [ "org/repo-one", "org/repo-two", "org/repo-three" ]
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Delete workflow runs in repository
+        uses: step-security/delete-workflow-runs@v2
+        with:
+          token: ${{ secrets.PAT_TOKEN }} # PAT with repo scope required for cross-repo
+          repository: ${{ matrix.repository }}
+          retain_days: ${{ github.event.inputs.days }}
+          keep_minimum_runs: ${{ github.event.inputs.minimum_runs }}
+          # example: match workflows named 'build' OR 'deploy'
+          delete_workflow_pattern: build|deploy
+          use_daily_retention: ${{ github.event.inputs.use_daily_retention }}
+          dry_run: "false"
+```
+
+### GitHub Enterprise / GHES
+
+For GitHub Enterprise, specify the API base URL via `baseUrl`:
+
+```yaml
+jobs:
+  delete-runs:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Delete old workflow runs
+        uses: step-security/delete-workflow-runs@v2
+        with:
+          token: ${{ secrets.PAT_TOKEN }}
+          baseUrl: https://github.mycompany.com/api/v3
+          repository: mycompany/myrepo
+          retain_days: 30
+          keep_minimum_runs: 6
+          use_daily_retention: "true"
+```
+
+## Troubleshooting & Notes
+
+- Use `dry_run: true` first to preview which runs would be deleted.
+- When filtering by workflow name/filename or conclusions, ensure your patterns match the targets you expect. Consider testing on a small repo first.
+- The Action will not delete runs that are linked to open pull requests if `check_pullrequest_exist` is set to `true`.
+- For `delete_workflow_pattern`, use `|` to supply multiple alternative patterns (logical OR). Example: `build|deploy` matches either "build" or "deploy".
+- For `use_daily_retention: true`, the minimum number of runs per day will be retained; excess runs for the same day can be deleted if older than `retain_days`.
+- Orphan workflow runs (belonging to deleted workflows) are automatically identified and can be deleted.
+- For cross-repository execution, ensure the token provided has necessary scopes (PAT with `repo` for private repos / cross-repo operations).
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).

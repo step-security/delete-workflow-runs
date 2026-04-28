@@ -1,0 +1,57 @@
+name: "Delete Workflow Runs"
+description: "GitHub Action to delete workflow runs in a repository."
+author: "step-security"
+inputs:
+  token:
+    description: "GitHub authentication token"
+    required: false
+    default: ${{ github.token }}
+  baseUrl:
+    description: "GitHub API base URL (for GitHub Enterprise)"
+    required: false
+    default: "https://api.github.com"
+  repository:
+    description: "Repository name in {owner}/{repo} format"
+    required: false
+    default: ${{ github.repository }}
+  retain_days:
+    description: "Number of days to retain workflow runs"
+    required: false
+    default: "30"
+  keep_minimum_runs:
+    description: "Minimum number of runs to keep per workflow (or per day if use_daily_retention is true)"
+    required: false
+    default: "6"
+  use_daily_retention:
+    description: "If true, keep_minimum_runs will be applied per day instead of overall"
+    required: false
+    default: "false"
+  delete_workflow_pattern:
+    description: "Workflow name or filename pattern (omit for all)"
+    required: false
+  delete_workflow_by_state_pattern:
+    description: "Workflow states to target (comma-separated or ALL)"
+    required: false
+    default: "ALL"
+  delete_run_by_conclusion_pattern:
+    description: "Run conclusions to target (comma-separated or ALL)"
+    required: false
+    default: "ALL"
+  dry_run:
+    description: "Simulate deletions without performing them"
+    required: false
+    default: "false"
+  check_branch_existence:
+    description: "Skip runs from existing branches (excludes main)"
+    required: false
+    default: "false"
+  check_pullrequest_exist:
+    description: "Skip runs linked to pull requests"
+    required: false
+    default: "false"
+branding:
+  icon: "trash"
+  color: "red"
+runs:
+  using: "node24"
+  main: "dist/index.js"
