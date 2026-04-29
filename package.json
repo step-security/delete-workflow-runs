@@ -1,0 +1,44 @@
+{
+  "name": "delete-workflow-runs",
+  "version": "2.1.0",
+  "description": "GitHub Action to delete workflow runs in a repository.",
+  "main": "dist/index.js",
+  "private": true,
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "prebuild": "npm run lint",
+    "build": "ncc build index.js -o dist --minify",
+    "lint": "eslint . --ext .js --no-config-lookup",
+    "format": "prettier --print-width 200 --write ./index.js",
+    "ci": "npm ci --prefer-offline --no-audit --progress=false"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/step-security/delete-workflow-runs.git"
+  },
+  "keywords": [
+    "github",
+    "actions",
+    "workflow",
+    "delete"
+  ],
+  "author": "step-security",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "dependencies": {
+    "@actions/core": "^2.0.2",
+    "@octokit/plugin-throttling": "^11.0.3",
+    "@octokit/rest": "^22.0.1",
+    "axios": "^1.15.0"
+  },
+  "devDependencies": {
+    "@vercel/ncc": "^0.38.4",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.7.4"
+  }
+}
